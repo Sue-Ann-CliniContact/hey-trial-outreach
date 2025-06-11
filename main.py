@@ -2,6 +2,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
+import requests
+from bs4 import BeautifulSoup
+import re
 
 from matcher import match_studies
 from generate_email import generate_outreach_email
@@ -11,7 +14,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can restrict to your domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,20 +22,48 @@ app.add_middleware(
 
 session_memory = {}
 
-# --------- Placeholder for condition extractor from landing page ---------
+# --------- Real BeautifulSoup extractor ---------
 def extract_study_criteria_from_url(url: str):
-    # TODO: Replace with real HTML parsing / scraping
-    return {
-        "condition": "autism",
-        "min_age": 5,
-        "max_age": 17
-    }
+    try:
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        text = soup.get_text().lower()
+
+        # Extract condition
+        if "autism" in text:
+            condition = "autism"
+        elif "adhd" in text:
+            condition = "adhd"
+        else:
+            condition = "unknown"
+
+        # Extract age range
+        age_match = re.search(r'ages?\s*(\d+)[\s–-]+(\d+)', text)
+        if age_match:
+            min_age = int(age_match.group(1))
+            max_age = int(age_match.group(2))
+        else:
+            min_age = 5
+            max_age = 17
+
+        return {
+            "condition": condition,
+            "min_age": min_age,
+            "max_age": max_age
+        }
+    except Exception as e:
+        print(f"⚠️ Error scraping study URL: {e}")
+        return {
+            "condition": "autism",
+            "min_age": 5,
+            "max_age": 17
+        }
 
 @app.post("/chat")
 async def chat(request: Request):
     data = await request.json()
     session_id = data.get("session_id")
-    message = data.get("message", "").strip().lower()
+    message = data.get("message", "").strip()
 
     if session_id not in session_memory:
         session_memory[session_id] = {
@@ -70,7 +101,6 @@ async def chat(request: Request):
 
     elif state["step"] == 3:
         state["challenge_summary"] = message
-        # Perform match
         matches = match_studies(
             condition=state["condition"],
             campaign_min_age=state["min_age"],
@@ -81,10 +111,9 @@ async def chat(request: Request):
         state["sent_count"] = 0
         state["step"] += 1
 
-    # Return 5 matches at a time
     if state["step"] >= 4:
-        if "load more" in message:
-            pass  # continue to load more
+        if "load more" in message.lower():
+            pass
         elif state["sent_count"] > 0:
             return {"reply": "If you'd like to see more matches, type 'load more'."}
 
@@ -97,7 +126,6 @@ async def chat(request: Request):
 
         replies = []
         for study in batch:
-            # Push to Monday and generate email
             push_to_monday(study, state["study_url"])
             doc_link = generate_outreach_email(
                 study,
@@ -110,10 +138,14 @@ async def chat(request: Request):
 📨 {study.get('contact_email', 'Email N/A')}  
 [View Study](https://clinicaltrials.gov/ct2/show/{study['nct_id']})  
 [📄 Download Email]({doc_link})  
-➡️ This matched because it's also targeting **{state['condition']}** and has overlapping age criteria."""
+➡️ This matched because it targets **{state['condition']}** and overlaps with the age criteria."""
             replies.append(msg)
 
         state["sent_count"] += len(batch)
         return {"reply": "\n\n---\n\n".join(replies)}
 
     return {"reply": "Unexpected state. Please refresh and try again."}
+
+# Optional for local testing:
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=10000)
