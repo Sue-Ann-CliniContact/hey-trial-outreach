@@ -9,17 +9,18 @@ from googleapiclient.http import MediaIoBaseUpload
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# Your shared Google Drive folder ID
 FOLDER_ID = "1ruHSgI3jo4rKKrLahitkNzFwGwT3yjCt"
-CREDENTIALS_PATH = "credentials.json"
 
 def upload_to_drive(local_path, filename):
-    if not os.path.exists(CREDENTIALS_PATH):
-        raise FileNotFoundError("credentials.json not found in the project directory.")
-
-    credentials = service_account.Credentials.from_service_account_file(
-        CREDENTIALS_PATH,
+    # Load credentials from environment variable instead of file
+    creds_json = os.getenv("GOOGLE_CREDENTIALS")
+    creds_dict = json.loads(creds_json)
+    credentials = service_account.Credentials.from_service_account_info(
+        creds_dict,
         scopes=["https://www.googleapis.com/auth/drive"]
     )
+
     service = build("drive", "v3", credentials=credentials)
 
     file_metadata = {
