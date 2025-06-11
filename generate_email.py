@@ -2,14 +2,23 @@ from docx import Document
 from datetime import date
 import os
 import io
+import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
+# Your shared Google Drive folder ID
 FOLDER_ID = "1ruHSgI3jo4rKKrLahitkNzFwGwT3yjCt"
 
 def upload_to_drive(local_path, filename):
-    credentials = service_account.Credentials.from_service_account_file("credentials.json", scopes=["https://www.googleapis.com/auth/drive"])
+    # Load credentials from environment variable instead of file
+    creds_json = os.getenv("GOOGLE_CREDENTIALS")
+    creds_dict = json.loads(creds_json)
+    credentials = service_account.Credentials.from_service_account_info(
+        creds_dict,
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+
     service = build("drive", "v3", credentials=credentials)
 
     file_metadata = {
