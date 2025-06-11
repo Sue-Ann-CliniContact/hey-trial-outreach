@@ -40,7 +40,7 @@ def upload_to_drive(local_path, filename):
     service.permissions().create(fileId=file_id, body={"role": "reader", "type": "anyone"}).execute()
     return f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
 
-def generate_outreach_email(match, your_study_title, challenge_summary, success_summary="", agent_name="The CliniContact Team", output_folder="emails"):
+def generate_outreach_email(match, your_study_title, challenge_summary, success_summary="", agent_name="The CliniContact Team", agent_title="", output_folder="emails"):
     os.makedirs(output_folder, exist_ok=True)
 
     prompt = f"""
@@ -56,7 +56,7 @@ You recently supported a study titled "{your_study_title}". The recruitment chal
 
 Mention that CliniContact specializes in high-quality participant recruitment for complex and underrepresented populations. Offer to connect for a short exploratory call. Keep the tone collegial and confident, and refer to any overlap between the studies (condition or age relevance).
 
-Sign off as {agent_name} from info@clinicontact.com.
+Sign off as {agent_name}, {agent_title} from info@clinicontact.com.
 """
 
     response = openai.ChatCompletion.create(
