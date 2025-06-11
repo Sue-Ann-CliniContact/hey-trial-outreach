@@ -1,4 +1,5 @@
 import json
+from push_to_monday import push_to_monday
 
 def load_indexed_studies(path="indexed_studies.json"):
     with open(path, "r", encoding="utf-8") as f:
@@ -38,14 +39,19 @@ def match_studies(campaign_condition="autism", campaign_min_age=5, campaign_max_
             "contact_name": s.get("contact_name"),
             "contact_email": s.get("contact_email"),
             "location": s.get("locations", ""),
-            "why_match": f"Similar age range and autism condition",
+            "why_match": "Similar age range and autism-related condition"
         })
 
     return matches[:top_n]
 
 if __name__ == "__main__":
-    result = match_studies()
-    for i, study in enumerate(result, 1):
-        print(f"\nMatch {i}:")
-        for k, v in study.items():
-            print(f"{k}: {v}")
+    print("🔍 Finding matches...")
+    matched_studies = match_studies(campaign_min_age=5, campaign_max_age=15, top_n=5)
+
+    internal_study_name = "Autism CA 2024"
+    if not matched_studies:
+        print("⚠️ No matches found.")
+    else:
+        print(f"✅ Found {len(matched_studies)} matches. Pushing to Monday.com...")
+        for match in matched_studies:
+            push_to_monday(match, internal_study_name=internal_study_name)
