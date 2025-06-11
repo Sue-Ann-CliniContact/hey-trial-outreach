@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -22,13 +21,13 @@ app.add_middleware(
 )
 
 session_memory = {}
+
 def extract_study_criteria_from_url(url: str):
     try:
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         text = soup.get_text().lower()
 
-        # Expanded condition matching logic
         condition_keywords = {
             "autism": ["autism", "asd", "autistic"],
             "adhd": ["adhd", "attention deficit"],
@@ -54,7 +53,7 @@ def extract_study_criteria_from_url(url: str):
                 detected_condition = label
                 break
 
-        age_match = re.search(r'ages?\s*(\d+)[\s–-]+(\d+)', text)
+        age_match = re.search(r'ages?\s*(\d+)[\s–\-]+(\d+)', text)
         if age_match:
             min_age = int(age_match.group(1))
             max_age = int(age_match.group(2))
@@ -75,6 +74,7 @@ def extract_study_criteria_from_url(url: str):
             "min_age": 5,
             "max_age": 17
         }
+
 @app.post("/chat")
 async def chat(request: Request):
     data = await request.json()
@@ -96,6 +96,44 @@ async def chat(request: Request):
         }
 
     state = session_memory[session_id]
+
+    if state["step"] == 0:
+        state["step"] += 1
+        return {"reply": "Hi 👋 Who is the CliniContact outreach agent for this effort?"}
+
+    elif state["step"] == 1:
+        state["agent_name"] = message.title()
+        state["step"] += 1
+        return {"reply": f"What is {state['agent_name']}'s title?"}
+
+    elif state["step"] == 2:
+        state["agent_title"] = message.strip()
+        state["step"] += 1
+        return {"reply": "Great. Please paste the landing page or ClinicalTrials.gov link for the study you're referencing."}
+
+    elif state["step"] == 3:
+        if message.startswith("http"):
+            state["study_url"] = message
+            parsed = extract_study_criteria_from_url(message)
+            state["condition"] = parsed["condition"]
+            state["min_age"] = parsed["min_age"]
+            state["max_age"] = parsed["max_age"]
+            state["step"] += 1
+            return {"reply": f"Got it. What challenges have you experienced with recruitment for this study?"}
+        return {"reply": "Please provide a valid study link."}
+
+    elif state["step"] == 4:
+        state["challenge_summary"] = message
+        matches = match_studies(
+            condition=state["condition"],
+            campaign_min_age=state["min_age"],
+            campaign_max_age=state["max_age"],
+            require_contact_email=True,
+            challenge_summary=state["challenge_summary"]
+        )
+        state["matched_studies"] = matches
+        state["sent_count"] = 0
+        state["step"] += 1
 
     if state["step"] >= 5:
         start = state["sent_count"]
@@ -123,7 +161,7 @@ async def chat(request: Request):
 📨 {contact_info}  
 [View Study](https://clinicaltrials.gov/ct2/show/{study['nct_id']})  
 [📄 Download Email]({doc_link})  
-➡️ This matched because {study.get('match_reason', f'it targets {state["condition"]} and overlaps with the age criteria.')}"""
+➡️ This matched because {study.get('match_reason', f'it targets {state['condition']} and overlaps with the age criteria.')}"""
             replies.append(msg)
 
         state["sent_count"] += len(batch)
