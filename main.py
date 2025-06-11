@@ -96,7 +96,3 @@ Email: {selected.get("contact_email", "N/A")}
     else:
         return {"reply": "You're all set! Refresh to start a new session."}
 
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
