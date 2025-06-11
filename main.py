@@ -75,7 +75,6 @@ def extract_study_criteria_from_url(url: str):
             "min_age": 5,
             "max_age": 17
         }
-
 @app.post("/chat")
 async def chat(request: Request):
     data = await request.json()
@@ -97,44 +96,43 @@ async def chat(request: Request):
         }
 
     state = session_memory[session_id]
-    
+
     if state["step"] >= 5:
-    start = state["sent_count"]
-    end = start + 5
-    batch = state["matched_studies"][start:end]
+        start = state["sent_count"]
+        end = start + 5
+        batch = state["matched_studies"][start:end]
 
-    if not batch:
-        return {"reply": "✅ No more matches to show. You're all caught up!"}
+        if not batch:
+            return {"reply": "✅ No more matches to show. You're all caught up!"}
 
-    replies = []
-    for study in batch:
-        doc_link = generate_outreach_email(
-            study,
-            your_study_title=state["study_url"],
-            challenge_summary=state["challenge_summary"],
-            agent_name=state["agent_name"],
-            agent_title=state["agent_title"]
-        )
-        contact_info = ", ".join(study.get("all_contacts", [study.get("contact_email", "N/A")]))
-        push_result = push_to_monday(study, internal_study_name=state["study_url"])
-        print(f"✅ Study pushed to Monday: {push_result}")
+        replies = []
+        for study in batch:
+            doc_link = generate_outreach_email(
+                study,
+                your_study_title=state["study_url"],
+                challenge_summary=state["challenge_summary"],
+                agent_name=state["agent_name"],
+                agent_title=state["agent_title"]
+            )
+            contact_info = ", ".join(study.get("all_contacts", [study.get("contact_email", "N/A")]))
+            push_result = push_to_monday(study, internal_study_name=state["study_url"])
+            print(f"✅ Study pushed to Monday: {push_result}")
 
-        msg = f"""**{study['title']}**  
+            msg = f"""**{study['title']}**  
 📍 {study.get('location', 'Location N/A')}  
 📨 {contact_info}  
 [View Study](https://clinicaltrials.gov/ct2/show/{study['nct_id']})  
 [📄 Download Email]({doc_link})  
 ➡️ This matched because {study.get('match_reason', f'it targets {state["condition"]} and overlaps with the age criteria.')}"""
-        replies.append(msg)
+            replies.append(msg)
 
-    state["sent_count"] += len(batch)
+        state["sent_count"] += len(batch)
 
-    # ✅ Always append the load more message if more studies remain
-    if state["sent_count"] < len(state["matched_studies"]):
-        replies.append("If you'd like to see more matches, type 'load more'.")
-    else:
-        replies.append("✅ No more matches to show. You're all caught up!")
+        if state["sent_count"] < len(state["matched_studies"]):
+            replies.append("If you'd like to see more matches, type 'load more'.")
+        else:
+            replies.append("✅ No more matches to show. You're all caught up!")
 
-    return {"reply": "\n\n---\n\n".join(replies)}
+        return {"reply": "\n\n---\n\n".join(replies)}
 
     return {"reply": "Unexpected state. Please refresh and try again."}
