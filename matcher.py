@@ -1,4 +1,5 @@
 import json
+import re
 from difflib import SequenceMatcher
 
 def load_indexed_studies(path="indexed_studies.json"):
@@ -17,10 +18,34 @@ def condition_matches(study_condition, target_condition, threshold=0.6):
         or match_score >= threshold
     )
 
+def extract_age_from_text(text):
+    text = text.lower()
+    age_matches = re.findall(r"(?:aged|age|ages|participants aged)\s*(\d{1,3})\s*(?:to|–|-|through|and)\s*(\d{1,3})", text)
+    if age_matches:
+        try:
+            return int(age_matches[0][0]), int(age_matches[0][1])
+        except:
+            return None, None
+    age_single = re.findall(r"aged?\s*(\d{1,3})\s*(?:\+|and up|or older)", text)
+    if age_single:
+        try:
+            return int(age_single[0]), 100
+        except:
+            return None, None
+    return None, None
+
 def age_overlap(study, min_age=None, max_age=None, tolerance=3):
     try:
-        study_min = int(study.get("min_age", 0))
-        study_max = int(study.get("max_age", 100))
+        study_min = study.get("min_age_years")
+        study_max = study.get("max_age_years")
+
+        if study_min is None or study_max is None:
+            text = study.get("eligibility_text", "")
+            study_min, study_max = extract_age_from_text(text)
+
+        study_min = study_min if study_min is not None else 0
+        study_max = study_max if study_max is not None else 100
+
         min_check = (min_age is None or study_max + tolerance >= min_age)
         max_check = (max_age is None or study_min - tolerance <= max_age)
         return min_check and max_check
@@ -32,7 +57,7 @@ def match_studies(condition="autism", campaign_min_age=5, campaign_max_age=15, t
     matches = []
 
     for s in studies:
-        study_condition = s.get("condition", "")
+        study_condition = s.get("condition") or s.get("study_title") or s.get("summary", "")
         if not condition_matches(study_condition, condition):
             continue
 

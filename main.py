@@ -30,10 +30,12 @@ def extract_study_criteria_from_url(url: str):
         text = soup.get_text().lower()
 
         # Extract condition
-        if "autism" in text:
+        if any(kw in text for kw in ["autism", "asd", "autistic"]):
             condition = "autism"
-        elif "adhd" in text:
+        elif any(kw in text for kw in ["adhd", "attention deficit"]):
             condition = "adhd"
+        elif "diabetes" in text:
+            condition = "diabetes"
         else:
             condition = "unknown"
 
@@ -133,7 +135,7 @@ async def chat(request: Request):
                 challenge_summary=state["challenge_summary"],
                 agent_name=state["agent_name"]
             )
-            msg = f"""**{study['title']}**  
+            msg = f"""**{study['study_title']}**  
 📍 {study.get('location', 'Location N/A')}  
 📨 {study.get('contact_email', 'Email N/A')}  
 [View Study](https://clinicaltrials.gov/ct2/show/{study['nct_id']})  
@@ -145,7 +147,3 @@ async def chat(request: Request):
         return {"reply": "\n\n---\n\n".join(replies)}
 
     return {"reply": "Unexpected state. Please refresh and try again."}
-
-# Optional for local testing:
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=10000)
