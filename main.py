@@ -22,14 +22,12 @@ app.add_middleware(
 
 session_memory = {}
 
-# --------- Real BeautifulSoup extractor ---------
 def extract_study_criteria_from_url(url: str):
     try:
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         text = soup.get_text().lower()
 
-        # Extract condition
         if any(kw in text for kw in ["autism", "asd", "autistic"]):
             condition = "autism"
         elif any(kw in text for kw in ["adhd", "attention deficit"]):
@@ -39,7 +37,6 @@ def extract_study_criteria_from_url(url: str):
         else:
             condition = "unknown"
 
-        # Extract age range
         age_match = re.search(r'ages?\s*(\d+)[\s–-]+(\d+)', text)
         if age_match:
             min_age = int(age_match.group(1))
@@ -82,7 +79,6 @@ async def chat(request: Request):
 
     state = session_memory[session_id]
 
-    # Conversation flow
     if state["step"] == 0:
         state["step"] += 1
         return {"reply": "Hi 👋 Who is the CliniContact outreach agent for this effort?"}
@@ -130,14 +126,23 @@ async def chat(request: Request):
         for study in batch:
             push_to_monday(study, state["study_url"])
             doc_link = generate_outreach_email(
-                study,
+                match=study,
                 your_study_title=state["study_url"],
                 challenge_summary=state["challenge_summary"],
                 agent_name=state["agent_name"]
             )
+
+            contacts = []
+            if study.get("contact_name") and study.get("contact_email"):
+                contacts.append(f"📨 {study['contact_name']} – {study['contact_email']}")
+            if study.get("backup_contact_name") and study.get("backup_contact_email"):
+                contacts.append(f"📨 {study['backup_contact_name']} – {study['backup_contact_email']}")
+
+            contact_str = "\n".join(contacts) if contacts else "📨 No contacts available"
+
             msg = f"""**{study['study_title']}**  
 📍 {study.get('location', 'Location N/A')}  
-📨 {study.get('contact_email', 'Email N/A')}  
+{contact_str}  
 [View Study](https://clinicaltrials.gov/ct2/show/{study['nct_id']})  
 [📄 Download Email]({doc_link})  
 ➡️ This matched because it targets **{state['condition']}** and overlaps with the age criteria."""
