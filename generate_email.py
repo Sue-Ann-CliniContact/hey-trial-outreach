@@ -6,24 +6,20 @@ import openai
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import json
 
-# Load OpenAI API key from environment
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Use environment variable for Google credentials JSON string
-GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 FOLDER_ID = "1ruHSgI3jo4rKKrLahitkNzFwGwT3yjCt"
+CREDENTIALS_PATH = "credentials.json"
 
 def upload_to_drive(local_path, filename):
-    if not GOOGLE_CREDENTIALS_JSON:
-        raise ValueError("Missing GOOGLE_CREDENTIALS_JSON environment variable.")
+    if not os.path.exists(CREDENTIALS_PATH):
+        raise FileNotFoundError("credentials.json not found in the project directory.")
 
-    credentials_info = json.loads(GOOGLE_CREDENTIALS_JSON)
-    credentials = service_account.Credentials.from_service_account_info(
-        credentials_info, scopes=["https://www.googleapis.com/auth/drive"]
+    credentials = service_account.Credentials.from_service_account_file(
+        CREDENTIALS_PATH,
+        scopes=["https://www.googleapis.com/auth/drive"]
     )
-
     service = build("drive", "v3", credentials=credentials)
 
     file_metadata = {
@@ -42,7 +38,6 @@ def upload_to_drive(local_path, filename):
 def generate_outreach_email(match, your_study_title, challenge_summary, success_summary="", agent_name="The CliniContact Team", output_folder="emails"):
     os.makedirs(output_folder, exist_ok=True)
 
-    # Create GPT prompt
     prompt = f"""
 You are a clinical outreach strategist at CliniContact.
 
@@ -59,7 +54,6 @@ Mention that CliniContact specializes in high-quality participant recruitment fo
 Sign off as {agent_name} from info@clinicontact.com.
 """
 
-    # Generate content via OpenAI
     response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
@@ -68,9 +62,9 @@ Sign off as {agent_name} from info@clinicontact.com.
         ],
         temperature=0.7
     )
+
     email_text = response['choices'][0]['message']['content']
 
-    # Save to Word document
     doc = Document()
     doc.add_heading('Personalized Outreach Email', level=1)
     doc.add_paragraph(f"Date: {date.today().strftime('%B %d, %Y')}\n")
