@@ -3,25 +3,21 @@ from datetime import date
 import os
 import io
 import json
-import openai
+import base64
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
 FOLDER_ID = "1ruHSgI3jo4rKKrLahitkNzFwGwT3yjCt"
 
 def upload_to_drive(local_path, filename):
-    creds_json = os.getenv("GOOGLE_CREDENTIALS")
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     if not creds_json:
-        raise ValueError("Missing GOOGLE_CREDENTIALS environment variable.")
-    
-    creds_dict = json.loads(creds_json)
-    credentials = service_account.Credentials.from_service_account_info(
-        creds_dict,
-        scopes=["https://www.googleapis.com/auth/drive"]
-    )
+        raise ValueError("Missing GOOGLE_CREDENTIALS_JSON environment variable.")
 
+    creds_dict = json.loads(creds_json)
+    credentials = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
     service = build("drive", "v3", credentials=credentials)
 
     file_metadata = {
@@ -37,41 +33,40 @@ def upload_to_drive(local_path, filename):
     service.permissions().create(fileId=file_id, body={"role": "reader", "type": "anyone"}).execute()
     return f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
 
-def generate_outreach_email(match, your_study_title, challenge_summary, success_summary="", agent_name="The CliniContact Team", output_folder="emails"):
+def generate_outreach_email(match, your_study_title, challenge_summary, success_summary="", agent_name="CliniContact", agent_title="", output_folder="emails"):
     os.makedirs(output_folder, exist_ok=True)
+    doc = Document()
+    doc.add_heading("Personalized Outreach Email", level=1)
 
-    prompt = f"""
-You are a clinical outreach strategist at CliniContact.
+    today = date.today().strftime('%B %d, %Y')
+    doc.add_paragraph(f"Date: {today}\n")
 
-Write a warm, intelligent, and personalized outreach email to the study contact {match.get('contact_name', 'the research team')} regarding the study titled:
-"{match.get('study_title')}".
+    contact = match.get('contact_name', 'Research Team')
+    doc.add_paragraph(f"Subject: Potential Collaboration on {match.get('study_title', 'your study')}\n")
+    doc.add_paragraph(f"Dear {contact},\n")
 
-You recently supported a study titled "{your_study_title}". The recruitment challenge was:
-"{challenge_summary}".
-
-{f"The results we achieved: {success_summary}" if success_summary else ""}
-
-Mention that CliniContact specializes in high-quality participant recruitment for complex and underrepresented populations. Offer to connect for a short exploratory call. Keep the tone collegial and confident, and refer to any overlap between the studies (condition or age relevance).
-
-Sign off as {agent_name} from info@clinicontact.com.
-"""
-
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are a thoughtful, persuasive outreach writer for a clinical recruitment company."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.7
+    doc.add_paragraph(
+        f"My name is {agent_name}, and I work as a {agent_title} at CliniContact, where we support clinical researchers in participant recruitment."
     )
 
-    email_text = response['choices'][0]['message']['content']
+    doc.add_paragraph(
+        f"I came across your study titled “{match.get('study_title')}”, and it immediately caught my attention due to its alignment with a recent campaign we supported: {your_study_title}."
+    )
 
-    doc = Document()
-    doc.add_heading('Personalized Outreach Email', level=1)
-    doc.add_paragraph(f"Date: {date.today().strftime('%B %d, %Y')}\n")
-    for line in email_text.split("\n"):
-        doc.add_paragraph(line.strip())
+    doc.add_paragraph("The recruitment challenge we faced in that study was:")
+    doc.add_paragraph(challenge_summary)
+
+    if success_summary:
+        doc.add_paragraph("Here’s what we accomplished:")
+        doc.add_paragraph(success_summary)
+
+    doc.add_paragraph(
+        "Because your study appears to target a similar population in terms of condition and age range, I believe we could offer targeted recruitment strategies that would meaningfully accelerate your enrollment goals."
+    )
+
+    doc.add_paragraph(
+        "Would you be open to a short exploratory conversation to discuss how we can help?"
+    )
 
     filename = f"{match.get('nct_id', 'study')}_outreach.docx"
     local_path = os.path.join(output_folder, filename)

@@ -22,6 +22,7 @@ app.add_middleware(
 
 session_memory = {}
 
+# --------- Scrape helper ---------
 def extract_study_criteria_from_url(url: str):
     try:
         response = requests.get(url, timeout=10)
@@ -35,7 +36,7 @@ def extract_study_criteria_from_url(url: str):
         elif "diabetes" in text:
             condition = "diabetes"
         else:
-            condition = "unknown"
+            condition = "general"
 
         age_match = re.search(r'ages?\s*(\d+)[\s–-]+(\d+)', text)
         if age_match:
@@ -53,7 +54,7 @@ def extract_study_criteria_from_url(url: str):
     except Exception as e:
         print(f"⚠️ Error scraping study URL: {e}")
         return {
-            "condition": "autism",
+            "condition": "general",
             "min_age": 5,
             "max_age": 17
         }
@@ -68,6 +69,7 @@ async def chat(request: Request):
         session_memory[session_id] = {
             "step": 0,
             "agent_name": "",
+            "agent_title": "",
             "study_url": "",
             "challenge_summary": "",
             "condition": "",
@@ -86,18 +88,23 @@ async def chat(request: Request):
     elif state["step"] == 1:
         state["agent_name"] = message.title()
         state["step"] += 1
-        return {"reply": "Great. Please paste the landing page or ClinicalTrials.gov link for the study you're referencing."}
+        return {"reply": "Thanks! What is your title or role at CliniContact?"}
 
     elif state["step"] == 2:
+        state["agent_title"] = message.strip()
+        state["step"] += 1
+        return {"reply": "Great. Please paste the landing page or ClinicalTrials.gov link for the study you're referencing."}
+
+    elif state["step"] == 3:
         state["study_url"] = message
         parsed = extract_study_criteria_from_url(message)
         state["condition"] = parsed["condition"]
         state["min_age"] = parsed["min_age"]
         state["max_age"] = parsed["max_age"]
         state["step"] += 1
-        return {"reply": f"Got it. What challenges have you experienced with recruitment for this study?"}
+        return {"reply": "Got it. What challenges have you experienced with recruitment for this study?"}
 
-    elif state["step"] == 3:
+    elif state["step"] == 4:
         state["challenge_summary"] = message
         matches = match_studies(
             condition=state["condition"],
@@ -110,8 +117,10 @@ async def chat(request: Request):
         state["step"] += 1
         return {"reply": "✅ Thank you. Showing your first matches now..."}
 
-    if state["step"] >= 4:
-        if "load more" not in message.lower() and state["sent_count"] > 0:
+    if state["step"] >= 5:
+        if "load more" in message.lower():
+            pass
+        elif state["sent_count"] > 0:
             return {"reply": "If you'd like to see more matches, type 'load more'."}
 
         start = state["sent_count"]
@@ -123,31 +132,36 @@ async def chat(request: Request):
 
         replies = []
         for study in batch:
-            push_to_monday(study, state["study_url"])
+            push_result = push_to_monday(study, state["study_url"])
+            print(f"✅ Study pushed to Monday: {study.get('nct_id')} | Success: {push_result}")
+
             doc_link = generate_outreach_email(
                 match=study,
                 your_study_title=state["study_url"],
                 challenge_summary=state["challenge_summary"],
-                agent_name=state["agent_name"]
+                agent_name=state["agent_name"],
+                agent_title=state["agent_title"]
             )
 
-            contacts = []
+            contact_lines = []
             if study.get("contact_name") and study.get("contact_email"):
-                contacts.append(f"📨 {study['contact_name']} – {study['contact_email']}")
+                contact_lines.append(f"📩 {study['contact_name']} – {study['contact_email']}")
             if study.get("backup_contact_name") and study.get("backup_contact_email"):
-                contacts.append(f"📨 {study['backup_contact_name']} – {study['backup_contact_email']}")
+                contact_lines.append(f"📩 {study['backup_contact_name']} – {study['backup_contact_email']}")
 
-            contact_str = "\n".join(contacts) if contacts else "📨 No contacts available"
+            contact_text = "\n".join(contact_lines) if contact_lines else "📩 Contact not available"
 
             msg = f"""**{study['study_title']}**  
 📍 {study.get('location', 'Location N/A')}  
-{contact_str}  
-[View Study](https://clinicaltrials.gov/ct2/show/{study['nct_id']})  
-[📄 Download Email]({doc_link})  
-➡️ This matched because it targets **{state['condition']}** and overlaps with the age criteria."""
+{contact_text}  
+[View Study]({study['study_link']})  
+📄 [Download Email]({doc_link})  
+➕ This matched because it targets **{state['condition']}** and overlaps with the age criteria."""
+
             replies.append(msg)
 
         state["sent_count"] += len(batch)
         return {"reply": "\n\n---\n\n".join(replies)}
 
     return {"reply": "Unexpected state. Please refresh and try again."}
+
