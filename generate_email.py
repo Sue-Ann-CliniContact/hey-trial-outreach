@@ -43,20 +43,28 @@ def upload_to_drive(local_path, filename):
 def generate_outreach_email(match, your_study_title, challenge_summary, success_summary="", agent_name="The CliniContact Team", agent_title="", output_folder="emails"):
     os.makedirs(output_folder, exist_ok=True)
 
+    contact_name = match.get('contact_name', 'the research team')
+    study_title = match.get('study_title') or match.get('title') or "your clinical study"
+
     prompt = f"""
 You are a clinical outreach strategist at CliniContact.
 
-Write a warm, intelligent, and personalized outreach email to the study contact {match.get('contact_name', 'the research team')} regarding the study titled:
-"{match.get('study_title')}". 
+Write a warm, intelligent, and personalized outreach email to {contact_name}, the study contact for:
+"{study_title}"
 
 You recently supported a study titled "{your_study_title}". The recruitment challenge was:
 "{challenge_summary}".
 
 {f"The results we achieved: {success_summary}" if success_summary else ""}
 
-Mention that CliniContact specializes in high-quality participant recruitment for complex and underrepresented populations. Offer to connect for a short exploratory call. Keep the tone collegial and confident, and refer to any overlap between the studies (condition or age relevance).
+Your goal is to write a collegial and confident message introducing CliniContact. Mention that:
+- We support research teams on complex recruitment and coordination, especially for underrepresented or hard-to-reach groups.
+- We’re currently supporting similar studies and may have infrastructure, insights, or support relevant to this PI's work.
+- You were impressed by their study’s focus (either condition, population, or methodology).
+- Offer to connect for a brief call or conversation to explore how you might support their team.
 
 Sign off as {agent_name}, {agent_title} from info@clinicontact.com.
+Keep the tone warm, smart, and strategic—similar to how Kit from CliniContact writes outreach emails.
 """
 
     response = openai.ChatCompletion.create(

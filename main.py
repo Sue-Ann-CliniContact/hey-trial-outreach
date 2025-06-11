@@ -112,7 +112,8 @@ async def chat(request: Request):
             condition=state["condition"],
             campaign_min_age=state["min_age"],
             campaign_max_age=state["max_age"],
-            require_contact_email=True
+            require_contact_email=True,
+            challenge_summary=state["challenge_summary"]
         )
         state["matched_studies"] = matches
         state["sent_count"] = 0
