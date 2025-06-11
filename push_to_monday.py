@@ -3,11 +3,11 @@ import requests
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Load local .env file if running locally
+# Load .env if local
 load_dotenv()
 
 MONDAY_API_KEY = os.getenv("MONDAY_API_KEY")
-BOARD_ID = 1987448172
+BOARD_ID = "1987448172"  # Fixed type from Int to ID (string)
 GROUP_ID = "topics"
 
 HEADERS = {
@@ -16,7 +16,7 @@ HEADERS = {
 }
 
 COLUMN_MAPPING = {
-    "name": "name",  # Row title
+    "name": "name",
     "date": "date4",
     "study_title": "text_mkrtxgyc",
     "study_summary": "long_text_mkrtn4eb",
@@ -27,7 +27,6 @@ COLUMN_MAPPING = {
 }
 
 def push_to_monday(match, internal_study_name="CliniContact Campaign"):
-    # Convert to Monday column JSON string
     column_values = {
         COLUMN_MAPPING["date"]: datetime.utcnow().strftime("%Y-%m-%d"),
         COLUMN_MAPPING["study_title"]: match.get("title", ""),
@@ -43,7 +42,7 @@ def push_to_monday(match, internal_study_name="CliniContact Campaign"):
 
     mutation = {
         "query": """
-        mutation ($board_id: Int!, $group_id: String!, $item_name: String!, $column_values: JSON!) {
+        mutation ($board_id: ID!, $group_id: String!, $item_name: String!, $column_values: JSON!) {
           create_item (
             board_id: $board_id,
             group_id: $group_id,
