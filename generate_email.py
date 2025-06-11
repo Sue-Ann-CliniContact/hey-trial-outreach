@@ -6,15 +6,24 @@ import openai
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
+import json
 
-# Load OpenAI key from environment
+# Load OpenAI API key from environment
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# Use environment variable for Google credentials JSON string
+GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 FOLDER_ID = "1ruHSgI3jo4rKKrLahitkNzFwGwT3yjCt"
 
 def upload_to_drive(local_path, filename):
-    credentials = service_account.Credentials.from_service_account_file(
-        "credentials.json", scopes=["https://www.googleapis.com/auth/drive"]
+    if not GOOGLE_CREDENTIALS_JSON:
+        raise ValueError("Missing GOOGLE_CREDENTIALS_JSON environment variable.")
+
+    credentials_info = json.loads(GOOGLE_CREDENTIALS_JSON)
+    credentials = service_account.Credentials.from_service_account_info(
+        credentials_info, scopes=["https://www.googleapis.com/auth/drive"]
     )
+
     service = build("drive", "v3", credentials=credentials)
 
     file_metadata = {
@@ -33,7 +42,7 @@ def upload_to_drive(local_path, filename):
 def generate_outreach_email(match, your_study_title, challenge_summary, success_summary="", agent_name="The CliniContact Team", output_folder="emails"):
     os.makedirs(output_folder, exist_ok=True)
 
-    # Create prompt with context
+    # Create GPT prompt
     prompt = f"""
 You are a clinical outreach strategist at CliniContact.
 
@@ -50,7 +59,7 @@ Mention that CliniContact specializes in high-quality participant recruitment fo
 Sign off as {agent_name} from info@clinicontact.com.
 """
 
-    # Generate content using GPT-4
+    # Generate content via OpenAI
     response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
