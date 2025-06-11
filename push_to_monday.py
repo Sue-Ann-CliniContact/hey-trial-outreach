@@ -7,14 +7,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MONDAY_API_KEY = os.getenv("MONDAY_API_KEY")
-BOARD_ID = "1987448172"  # Fixed type from Int to ID (string)
-GROUP_ID = "topics"
+BOARD_ID = "1987448172"  # From your board config
+GROUP_ID = "topics"       # Group ID confirmed
 
 HEADERS = {
     "Authorization": MONDAY_API_KEY,
     "Content-Type": "application/json"
 }
 
+# Match column IDs from your provided schema
 COLUMN_MAPPING = {
     "name": "name",
     "date": "date4",
@@ -56,7 +57,7 @@ def push_to_monday(match, internal_study_name="CliniContact Campaign"):
         "variables": {
             "board_id": BOARD_ID,
             "group_id": GROUP_ID,
-            "item_name": internal_study_name,
+            "item_name": match.get("title", "Untitled Study"),
             "column_values": column_values
         }
     }
@@ -65,11 +66,17 @@ def push_to_monday(match, internal_study_name="CliniContact Campaign"):
 
     if response.status_code == 200:
         print(f"✅ Study pushed to Monday: {match.get('title')}")
+        return True
     else:
-        print(f"❌ Error pushing to Monday:")
-        print(response.text)
+        print("❌ Error pushing to Monday:")
+        try:
+            error_data = response.json()
+            print(error_data)
+        except:
+            print(response.text)
+        return False
 
-# Optional test run
+# Optional local test
 if __name__ == "__main__":
     sample = {
         "nct_id": "NCT55555555",

@@ -75,25 +75,31 @@ def extract_demographic_keywords(text):
 def demographic_match_score(text, keywords):
     text = text.lower()
     score = 0
+    matched_keywords = []
     for kw in keywords:
         if kw in text:
+            matched_keywords.append(kw)
             score += 1
-    return score
+    return score, matched_keywords
 
 def match_studies(condition="autism", campaign_min_age=5, campaign_max_age=15, top_n=5, require_contact_email=True, challenge_summary=""):
     studies = load_indexed_studies()
     matches = []
 
-    # Extract targeting cues from agent's challenge description
     target_keywords = extract_demographic_keywords(challenge_summary)
+    print(f"📌 Extracted demographic keywords from challenge summary: {target_keywords}")
 
     for s in studies:
+        match_reason = []
+
         study_condition = s.get("condition") or s.get("study_title") or s.get("summary", "")
         if not condition_matches(study_condition, condition):
             continue
+        match_reason.append("condition match")
 
         if not age_overlap(s, campaign_min_age, campaign_max_age):
             continue
+        match_reason.append("age overlap")
 
         if require_contact_email and not s.get("contact_email"):
             continue
@@ -102,10 +108,15 @@ def match_studies(condition="autism", campaign_min_age=5, campaign_max_age=15, t
             s["title"] = s.get("study_title") or s.get("condition") or "Untitled Study"
 
         eligibility_text = s.get("eligibility_text", "") + " " + s.get("summary", "")
-        s["demographic_score"] = demographic_match_score(eligibility_text, target_keywords)
+        demo_score, demo_terms = demographic_match_score(eligibility_text, target_keywords)
+        s["demographic_score"] = demo_score
+        if demo_score > 0:
+            match_reason.append(f"mentions {', '.join(demo_terms)}")
 
+        s["match_reason"] = "; ".join(match_reason)
+
+        print(f"→ {s['title']} matched with score {demo_score} based on: {match_reason}")
         matches.append(s)
 
     matches = sorted(matches, key=lambda x: x.get("demographic_score", 0), reverse=True)
-
     return matches[:top_n]
