@@ -108,11 +108,10 @@ async def chat(request: Request):
         state["matched_studies"] = matches
         state["sent_count"] = 0
         state["step"] += 1
+        return {"reply": "✅ Thank you. Showing your first matches now..."}
 
     if state["step"] >= 4:
-        if "load more" in message.lower():
-            pass
-        elif state["sent_count"] > 0:
+        if "load more" not in message.lower() and state["sent_count"] > 0:
             return {"reply": "If you'd like to see more matches, type 'load more'."}
 
         start = state["sent_count"]

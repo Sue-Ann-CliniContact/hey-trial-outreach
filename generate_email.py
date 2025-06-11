@@ -2,19 +2,20 @@ from docx import Document
 from datetime import date
 import os
 import io
+import json
 import openai
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Your shared Google Drive folder ID
 FOLDER_ID = "1ruHSgI3jo4rKKrLahitkNzFwGwT3yjCt"
 
 def upload_to_drive(local_path, filename):
-    # Load credentials from environment variable instead of file
     creds_json = os.getenv("GOOGLE_CREDENTIALS")
+    if not creds_json:
+        raise ValueError("Missing GOOGLE_CREDENTIALS environment variable.")
+    
     creds_dict = json.loads(creds_json)
     credentials = service_account.Credentials.from_service_account_info(
         creds_dict,
@@ -43,10 +44,10 @@ def generate_outreach_email(match, your_study_title, challenge_summary, success_
 You are a clinical outreach strategist at CliniContact.
 
 Write a warm, intelligent, and personalized outreach email to the study contact {match.get('contact_name', 'the research team')} regarding the study titled:
-"{match.get('study_title')}"
+"{match.get('study_title')}".
 
 You recently supported a study titled "{your_study_title}". The recruitment challenge was:
-"{challenge_summary}"
+"{challenge_summary}".
 
 {f"The results we achieved: {success_summary}" if success_summary else ""}
 
