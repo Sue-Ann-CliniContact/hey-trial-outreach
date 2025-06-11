@@ -155,13 +155,15 @@ async def chat(request: Request):
             contact_info = ", ".join(study.get("all_contacts", [study.get("contact_email", "N/A")]))
             push_result = push_to_monday(study, internal_study_name=state["study_url"])
             print(f"✅ Study pushed to Monday: {push_result}")
+            
+            match_reason = study.get("match_reason", f"it targets {state['condition']} and overlaps with the age criteria.")
 
             msg = f"""**{study['title']}**  
 📍 {study.get('location', 'Location N/A')}  
 📨 {contact_info}  
 [View Study](https://clinicaltrials.gov/ct2/show/{study['nct_id']})  
 [📄 Download Email]({doc_link})  
-➡️ This matched because {study.get('match_reason', f'it targets {state['condition']} and overlaps with the age criteria.')}"""
+➡️ This matched because {match_reason}"""
             replies.append(msg)
 
         state["sent_count"] += len(batch)
