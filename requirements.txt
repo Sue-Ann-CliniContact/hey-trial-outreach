@@ -3,3 +3,5 @@ uvicorn
 requests
 python-docx
 python-dotenv
+beautifulsoup4
+requests
