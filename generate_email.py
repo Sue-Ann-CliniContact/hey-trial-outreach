@@ -2,23 +2,19 @@ from docx import Document
 from datetime import date
 import os
 import io
-import json
+import openai
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
-# Your shared Google Drive folder ID
+# Load OpenAI key from environment
+openai.api_key = os.getenv("OPENAI_API_KEY")
 FOLDER_ID = "1ruHSgI3jo4rKKrLahitkNzFwGwT3yjCt"
 
 def upload_to_drive(local_path, filename):
-    # Load credentials from environment variable instead of file
-    creds_json = os.getenv("GOOGLE_CREDENTIALS")
-    creds_dict = json.loads(creds_json)
-    credentials = service_account.Credentials.from_service_account_info(
-        creds_dict,
-        scopes=["https://www.googleapis.com/auth/drive"]
+    credentials = service_account.Credentials.from_service_account_file(
+        "credentials.json", scopes=["https://www.googleapis.com/auth/drive"]
     )
-
     service = build("drive", "v3", credentials=credentials)
 
     file_metadata = {
@@ -36,23 +32,41 @@ def upload_to_drive(local_path, filename):
 
 def generate_outreach_email(match, your_study_title, challenge_summary, success_summary="", agent_name="The CliniContact Team", output_folder="emails"):
     os.makedirs(output_folder, exist_ok=True)
+
+    # Create prompt with context
+    prompt = f"""
+You are a clinical outreach strategist at CliniContact.
+
+Write a warm, intelligent, and personalized outreach email to the study contact {match.get('contact_name', 'the research team')} regarding the study titled:
+"{match.get('study_title')}"
+
+You recently supported a study titled "{your_study_title}". The recruitment challenge was:
+"{challenge_summary}"
+
+{f"The results we achieved: {success_summary}" if success_summary else ""}
+
+Mention that CliniContact specializes in high-quality participant recruitment for complex and underrepresented populations. Offer to connect for a short exploratory call. Keep the tone collegial and confident, and refer to any overlap between the studies (condition or age relevance).
+
+Sign off as {agent_name} from info@clinicontact.com.
+"""
+
+    # Generate content using GPT-4
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a thoughtful, persuasive outreach writer for a clinical recruitment company."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7
+    )
+    email_text = response['choices'][0]['message']['content']
+
+    # Save to Word document
     doc = Document()
     doc.add_heading('Personalized Outreach Email', level=1)
-
     doc.add_paragraph(f"Date: {date.today().strftime('%B %d, %Y')}\n")
-    doc.add_paragraph(f"Dear {match.get('contact_name', 'Research Team')},\n")
-
-    doc.add_paragraph(f"I’m reaching out regarding your study titled:\n“{match.get('study_title')}”.")
-    doc.add_paragraph(f"At CliniContact, we recently supported a similar study, \"{your_study_title}\", which faced the following recruitment challenge:")
-    doc.add_paragraph(challenge_summary)
-
-    if success_summary:
-        doc.add_paragraph("Here’s what we were able to accomplish:")
-        doc.add_paragraph(success_summary)
-
-    doc.add_paragraph("Given the similarities between your study and ours (especially in terms of condition and participant age range), we believe our services could meaningfully accelerate your recruitment goals.")
-    doc.add_paragraph("We’d love to explore whether we could assist your team in the same way. Please let me know if you’d be open to a quick conversation.")
-    doc.add_paragraph(f"Warm regards,\n{agent_name}\ninfo@clinicontact.com")
+    for line in email_text.split("\n"):
+        doc.add_paragraph(line.strip())
 
     filename = f"{match.get('nct_id', 'study')}_outreach.docx"
     local_path = os.path.join(output_folder, filename)
