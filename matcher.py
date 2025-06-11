@@ -67,6 +67,10 @@ def match_studies(condition="autism", campaign_min_age=5, campaign_max_age=15, t
         if require_contact_email and not s.get("contact_email"):
             continue
 
+        # ✅ Ensure 'title' field is always present
+        if "title" not in s:
+            s["title"] = s.get("study_title") or s.get("condition") or "Untitled Study"
+
         matches.append(s)
 
     return matches[:top_n]
