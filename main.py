@@ -8,7 +8,7 @@ import re
 
 from matcher import match_studies
 from generate_email import generate_outreach_email
-from push_to_monday import push_to_monday, fetch_existing_links  # 🆕 import
+from push_to_monday import push_to_monday, fetch_existing_links
 
 app = FastAPI()
 
@@ -125,7 +125,6 @@ async def chat(request: Request):
     elif state["step"] == 4:
         state["challenge_summary"] = message
 
-        # Step 1: Get full match list
         all_matches = match_studies(
             condition=state["condition"],
             campaign_min_age=state["min_age"],
@@ -134,7 +133,6 @@ async def chat(request: Request):
             challenge_summary=state["challenge_summary"]
         )
 
-        # Step 2: Remove duplicates already on Monday.com
         existing_links = fetch_existing_links()
         filtered = []
         for m in all_matches:
@@ -142,6 +140,8 @@ async def chat(request: Request):
             trial_link = f"https://clinicaltrials.gov/study/{nct_id}"
             if trial_link not in existing_links:
                 filtered.append(m)
+            else:
+                print(f"⏭️ Skipped duplicate match: {trial_link}")
 
         state["matched_studies"] = filtered
         state["sent_count"] = 0
@@ -167,7 +167,7 @@ async def chat(request: Request):
             contact_info = ", ".join(study.get("all_contacts", [study.get("contact_email", "N/A")]))
             push_result = push_to_monday(study, internal_study_name=state["study_url"])
             print(f"✅ Study pushed to Monday: {push_result}")
-            
+
             match_reason = study.get("match_reason", f"it targets {state['condition']} and overlaps with the age criteria.")
 
             msg = f"""**{study['title']}**  

@@ -4,7 +4,7 @@ import requests
 from datetime import date
 
 MONDAY_API_KEY = os.getenv("MONDAY_API_KEY")
-BOARD_ID = "1999034079"
+BOARD_ID = "1999034079"  # Leave as string now
 GROUP_ID = "topics"
 
 HEADERS = {
@@ -26,10 +26,10 @@ def fetch_existing_links():
     }}
     """
     response = requests.post("https://api.monday.com/v2", headers=HEADERS, json={"query": query})
-    data = response.json()
     links = set()
 
     try:
+        data = response.json()
         for item in data["data"]["boards"][0]["items"]:
             for col in item["column_values"]:
                 if col["id"] == "link_mkrtn4m6" and col["text"]:
@@ -48,7 +48,7 @@ def push_to_monday(study, internal_study_name=""):
         return "Already pushed"
 
     mutation = """
-    mutation ($board_id: Int!, $group_id: String!, $item_name: String!, $column_values: JSON!) {
+    mutation ($board_id: ID!, $group_id: String!, $item_name: String!, $column_values: JSON!) {
       create_item(board_id: $board_id, group_id: $group_id, item_name: $item_name, column_values: $column_values) {
         id
       }
@@ -72,7 +72,7 @@ def push_to_monday(study, internal_study_name=""):
     }
 
     variables = {
-        "board_id": int(BOARD_ID),
+        "board_id": BOARD_ID,  # now passed as string
         "group_id": GROUP_ID,
         "item_name": internal_study_name or title,
         "column_values": json.dumps(column_values)
