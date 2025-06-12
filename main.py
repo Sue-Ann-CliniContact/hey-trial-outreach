@@ -81,7 +81,6 @@ async def chat(request: Request):
     session_id = data.get("session_id")
     message = data.get("message", "").strip()
 
-    # ✅ Add reset option
     if message.lower() in ["new study", "restart", "start over"]:
         session_memory[session_id] = {
             "step": 0,
@@ -147,19 +146,29 @@ async def chat(request: Request):
             campaign_max_age=state["max_age"],
             require_contact_email=True,
             challenge_summary=state["challenge_summary"],
-            top_n=100  # ✅ Allow enough matches to survive filtering
+            top_n=100
         )
 
         existing_links = fetch_existing_links()
+        print(f"✅ Fetched {len(existing_links)} existing study links from Monday.com")
+
         filtered = []
+        seen = set()
         for m in all_matches:
             nct_id = m.get("nct_id")
             trial_link = f"https://clinicaltrials.gov/study/{nct_id}"
-            if trial_link not in existing_links:
-                filtered.append(m)
-            else:
-                print(f"⏭️ Skipped duplicate match: {trial_link}")
 
+            if trial_link in seen:
+                continue
+            seen.add(trial_link)
+
+            if trial_link in existing_links:
+                print(f"⏭️ Skipped already-contacted study: {trial_link}")
+                continue
+
+            filtered.append(m)
+
+        print(f"✅ Filtered to {len(filtered)} new matches after deduplication")
         state["matched_studies"] = filtered
         state["sent_count"] = 0
         state["step"] += 1
