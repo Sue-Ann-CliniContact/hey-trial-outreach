@@ -34,7 +34,6 @@ def fetch_existing_emails():
 
     try:
         data = response.json()
-        print("📦 Raw response JSON:", json.dumps(data, indent=2))
 
         board = data.get("data", {}).get("boards", [{}])[0]
         items = board.get("items_page", {}).get("items", [])
