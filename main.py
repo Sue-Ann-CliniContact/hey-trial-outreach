@@ -8,7 +8,7 @@ import re
 
 from matcher import match_studies
 from generate_email import generate_outreach_email
-from push_to_monday import push_to_monday, fetch_existing_links
+from push_to_monday import push_to_monday, fetch_existing_emails
 
 app = FastAPI()
 
@@ -149,21 +149,19 @@ async def chat(request: Request):
             top_n=100
         )
 
-        existing_links = fetch_existing_links()
-        print(f"✅ Fetched {len(existing_links)} existing study links from Monday.com")
+        existing_emails = fetch_existing_emails()
+        print(f"✅ Fetched {len(existing_emails)} contact emails from Monday.com")
 
         filtered = []
         seen = set()
         for m in all_matches:
-            nct_id = m.get("nct_id")
-            trial_link = f"https://clinicaltrials.gov/study/{nct_id}"
-
-            if trial_link in seen:
+            email = (m.get("contact_email") or "").strip().lower()
+            if not email or email in seen:
                 continue
-            seen.add(trial_link)
+            seen.add(email)
 
-            if trial_link in existing_links:
-                print(f"⏭️ Skipped already-contacted study: {trial_link}")
+            if email in existing_emails:
+                print(f"⏭️ Skipped already-contacted email: {email}")
                 continue
 
             filtered.append(m)

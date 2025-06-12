@@ -2,7 +2,6 @@ import os
 import json
 import requests
 from datetime import date
-import re
 
 MONDAY_API_KEY = os.getenv("MONDAY_API_KEY")
 BOARD_ID = "1999034079"
@@ -13,11 +12,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-def extract_nct_id(link):
-    match = re.search(r'(NCT\d{8})', link)
-    return match.group(1) if match else None
-
-def fetch_existing_links():
+def fetch_existing_emails():
     query = f"""
     query {{
       boards(ids: {BOARD_ID}) {{
@@ -31,29 +26,27 @@ def fetch_existing_links():
     }}
     """
     response = requests.post("https://api.monday.com/v2", headers=HEADERS, json={"query": query})
-    links = set()
+    emails = set()
 
     try:
         data = response.json()
         items = data.get("data", {}).get("boards", [{}])[0].get("items", [])
         for item in items:
             for col in item.get("column_values", []):
-                if col["id"] == "link_mkrtn4m6" and col["text"]:
-                    nct_id = extract_nct_id(col["text"].strip())
-                    if nct_id:
-                        links.add(nct_id)
+                if col["id"] == "email_mkrt39hj" and col["text"]:
+                    emails.add(col["text"].strip().lower())
     except Exception as e:
-        print("❌ Error parsing Monday.com response for existing links:", e)
+        print("❌ Error parsing Monday.com response for existing emails:", e)
         print("🔎 Raw response:", response.text)
 
-    return links
+    return emails
 
 def push_to_monday(study, internal_study_name=""):
-    existing_nct_ids = fetch_existing_links()
-    study_nct_id = study["nct_id"]
+    existing_emails = fetch_existing_emails()
+    contact_email = study.get("contact_email", "").strip().lower()
 
-    if study_nct_id in existing_nct_ids:
-        print(f"⏭️ Skipping already pushed study: {study_nct_id}")
+    if contact_email in existing_emails:
+        print(f"⏭️ Skipping already pushed study for email: {contact_email}")
         return "Already pushed"
 
     mutation = """
@@ -64,12 +57,11 @@ def push_to_monday(study, internal_study_name=""):
     }
     """
 
-    contact_email = study.get("contact_email", "")
     contact_person = study.get("contact_name", "N/A")
     title = study.get("title", "Untitled")
     summary = study.get("summary", "")
     eligibility = study.get("eligibility_text", "")
-    study_link = f"https://clinicaltrials.gov/study/{study_nct_id}"
+    study_link = f"https://clinicaltrials.gov/study/{study['nct_id']}"
 
     column_values = {
         "text_mkrtxgyc": title,
