@@ -130,7 +130,8 @@ async def chat(request: Request):
             campaign_min_age=state["min_age"],
             campaign_max_age=state["max_age"],
             require_contact_email=True,
-            challenge_summary=state["challenge_summary"]
+            challenge_summary=state["challenge_summary"],
+            top_n=100  # ✅ Allow enough matches to survive filtering
         )
 
         existing_links = fetch_existing_links()
@@ -180,7 +181,9 @@ async def chat(request: Request):
 
         state["sent_count"] += len(batch)
 
-        if state["sent_count"] < len(state["matched_studies"]):
+        remaining = len(state["matched_studies"]) - state["sent_count"]
+        if remaining > 0:
+            replies.append(f"📊 {remaining} similar studies remaining that haven't been contacted yet.")
             replies.append("If you'd like to see more matches, type 'load more'.")
         else:
             replies.append("✅ No more matches to show. You're all caught up!")
