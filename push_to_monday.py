@@ -42,9 +42,12 @@ def fetch_existing_emails():
     return emails
 
 def push_to_monday(study, internal_study_name=""):
-    existing_emails = fetch_existing_emails()
-    contact_email = study.get("contact_email", "").strip().lower()
+    contact_email = (study.get("contact_email") or "").strip().lower()
+    if not contact_email:
+        print("⚠️ Skipping push due to missing email.")
+        return None
 
+    existing_emails = fetch_existing_emails()
     if contact_email in existing_emails:
         print(f"⏭️ Skipping already pushed study for email: {contact_email}")
         return "Already pushed"
