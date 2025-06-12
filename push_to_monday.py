@@ -19,7 +19,7 @@ def fetch_existing_emails():
         items {{
           column_values {{
             id
-            text
+            value
           }}
         }}
       }}
@@ -33,8 +33,14 @@ def fetch_existing_emails():
         items = data.get("data", {}).get("boards", [{}])[0].get("items", [])
         for item in items:
             for col in item.get("column_values", []):
-                if col["id"] == "email_mkrt39hj" and col["text"]:
-                    emails.add(col["text"].strip().lower())
+                if col["id"] == "email_mkrt39hj" and col["value"]:
+                    try:
+                        value_data = json.loads(col["value"])
+                        email = value_data.get("email", "").strip().lower()
+                        if email:
+                            emails.add(email)
+                    except json.JSONDecodeError:
+                        continue
     except Exception as e:
         print("❌ Error parsing Monday.com response for existing emails:", e)
         print("🔎 Raw response:", response.text)
