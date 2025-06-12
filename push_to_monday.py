@@ -47,14 +47,13 @@ def fetch_existing_emails():
                         if email:
                             emails.add(email)
                     except json.JSONDecodeError:
-                        # Fallback if it's just a raw string email
                         if "@" in value:
                             emails.add(value.strip().lower())
     except Exception as e:
         print("❌ Error parsing Monday.com response for existing emails:", e)
         print("🔎 Raw response:", response.text)
 
-    return emails
+    return email
 
 def push_to_monday(study, internal_study_name=""):
     contact_email = (study.get("contact_email") or "").strip().lower()
