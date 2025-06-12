@@ -34,13 +34,16 @@ def fetch_existing_emails():
         for item in items:
             for col in item.get("column_values", []):
                 if col["id"] == "email_mkrt39hj" and col["value"]:
+                    value = col["value"]
                     try:
-                        value_data = json.loads(col["value"])
+                        value_data = json.loads(value)
                         email = value_data.get("email", "").strip().lower()
                         if email:
                             emails.add(email)
                     except json.JSONDecodeError:
-                        continue
+                        # Fallback if it's just a raw string email
+                        if "@" in value:
+                            emails.add(value.strip().lower())
     except Exception as e:
         print("❌ Error parsing Monday.com response for existing emails:", e)
         print("🔎 Raw response:", response.text)
