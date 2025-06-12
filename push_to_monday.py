@@ -1,89 +1,88 @@
 import os
+import json
 import requests
-from datetime import datetime
-from dotenv import load_dotenv
-
-# Load .env if local
-load_dotenv()
+from datetime import date
 
 MONDAY_API_KEY = os.getenv("MONDAY_API_KEY")
-BOARD_ID = "1987448172"  # From your board config
-GROUP_ID = "topics"       # Group ID confirmed
+BOARD_ID = "1999034079"
+GROUP_ID = "topics"
 
 HEADERS = {
     "Authorization": MONDAY_API_KEY,
     "Content-Type": "application/json"
 }
 
-# Match column IDs from your provided schema
-COLUMN_MAPPING = {
-    "name": "name",
-    "date": "date4",
-    "study_title": "text_mkrtxgyc",
-    "study_summary": "long_text_mkrtn4eb",
-    "eligibility": "long_text_mkrtc9jf",
-    "nct_link": "link_mkrtn4m6",
-    "contact_name": "text_mkrtjwn9",
-    "contact_email": "email_mkrt39hj"
-}
-
-def push_to_monday(match, internal_study_name="CliniContact Campaign"):
-    column_values = {
-        COLUMN_MAPPING["date"]: datetime.utcnow().strftime("%Y-%m-%d"),
-        COLUMN_MAPPING["study_title"]: match.get("title", ""),
-        COLUMN_MAPPING["study_summary"]: match.get("summary", ""),
-        COLUMN_MAPPING["eligibility"]: match.get("eligibility", ""),
-        COLUMN_MAPPING["nct_link"]: {
-            "url": f"https://clinicaltrials.gov/ct2/show/{match.get('nct_id', '')}",
-            "text": "View Study"
-        },
-        COLUMN_MAPPING["contact_name"]: match.get("contact_name", ""),
-        COLUMN_MAPPING["contact_email"]: match.get("contact_email", "")
-    }
-
-    mutation = {
-        "query": """
-        mutation ($board_id: ID!, $group_id: String!, $item_name: String!, $column_values: JSON!) {
-          create_item (
-            board_id: $board_id,
-            group_id: $group_id,
-            item_name: $item_name,
-            column_values: $column_values
-          ) {
+def fetch_existing_links():
+    query = f"""
+    query {{
+      boards(ids: {BOARD_ID}) {{
+        items {{
+          column_values {{
             id
-          }
-        }
-        """,
-        "variables": {
-            "board_id": BOARD_ID,
-            "group_id": GROUP_ID,
-            "item_name": match.get("title", "Untitled Study"),
-            "column_values": column_values
-        }
+            text
+          }}
+        }}
+      }}
+    }}
+    """
+    response = requests.post("https://api.monday.com/v2", headers=HEADERS, json={"query": query})
+    data = response.json()
+    links = set()
+
+    try:
+        for item in data["data"]["boards"][0]["items"]:
+            for col in item["column_values"]:
+                if col["id"] == "link_mkrtn4m6" and col["text"]:
+                    links.add(col["text"].strip())
+    except Exception as e:
+        print("⚠️ Failed to parse existing links:", e)
+
+    return links
+
+def push_to_monday(study, internal_study_name=""):
+    existing_links = fetch_existing_links()
+    study_link = f"https://clinicaltrials.gov/study/{study['nct_id']}"
+
+    if study_link in existing_links:
+        print(f"⏭️ Skipping already pushed study: {study_link}")
+        return "Already pushed"
+
+    mutation = """
+    mutation ($board_id: Int!, $group_id: String!, $item_name: String!, $column_values: JSON!) {
+      create_item(board_id: $board_id, group_id: $group_id, item_name: $item_name, column_values: $column_values) {
+        id
+      }
+    }
+    """
+
+    contact_email = study.get("contact_email", "")
+    contact_person = study.get("contact_name", "N/A")
+    title = study.get("title", "Untitled")
+    summary = study.get("summary", "")
+    eligibility = study.get("eligibility_text", "")
+
+    column_values = {
+        "text_mkrtxgyc": title,
+        "long_text_mkrtn4eb": {"text": summary},
+        "long_text_mkrtc9jf": {"text": eligibility},
+        "link_mkrtn4m6": {"url": study_link, "text": study_link},
+        "text_mkrtjwn9": contact_person,
+        "email_mkrt39hj": {"email": contact_email, "text": contact_email},
+        "date4": {"date": date.today().isoformat()}
     }
 
-    response = requests.post("https://api.monday.com/v2", headers=HEADERS, json=mutation)
-
-    if response.status_code == 200:
-        print(f"✅ Study pushed to Monday: {match.get('title')}")
-        return True
-    else:
-        print("❌ Error pushing to Monday:")
-        try:
-            error_data = response.json()
-            print(error_data)
-        except:
-            print(response.text)
-        return False
-
-# Optional local test
-if __name__ == "__main__":
-    sample = {
-        "nct_id": "NCT55555555",
-        "title": "Autism Behavior Therapy Study",
-        "summary": "Testing parent-led CBT interventions in ASD youth.",
-        "eligibility": "Ages 8–16, formal ASD diagnosis, must attend weekly sessions.",
-        "contact_name": "Dr. Sarah Clinical",
-        "contact_email": "s.clinical@example.edu"
+    variables = {
+        "board_id": int(BOARD_ID),
+        "group_id": GROUP_ID,
+        "item_name": internal_study_name or title,
+        "column_values": json.dumps(column_values)
     }
-    push_to_monday(sample, internal_study_name="Autism CA 2024")
+
+    response = requests.post("https://api.monday.com/v2", headers=HEADERS, json={"query": mutation, "variables": variables})
+    data = response.json()
+
+    if "errors" in data:
+        print("❌ Monday.com error:", data["errors"])
+        return None
+
+    return title

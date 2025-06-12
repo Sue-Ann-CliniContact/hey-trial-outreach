@@ -8,7 +8,7 @@ import re
 
 from matcher import match_studies
 from generate_email import generate_outreach_email
-from push_to_monday import push_to_monday
+from push_to_monday import push_to_monday, fetch_existing_links  # 🆕 import
 
 app = FastAPI()
 
@@ -124,14 +124,26 @@ async def chat(request: Request):
 
     elif state["step"] == 4:
         state["challenge_summary"] = message
-        matches = match_studies(
+
+        # Step 1: Get full match list
+        all_matches = match_studies(
             condition=state["condition"],
             campaign_min_age=state["min_age"],
             campaign_max_age=state["max_age"],
             require_contact_email=True,
             challenge_summary=state["challenge_summary"]
         )
-        state["matched_studies"] = matches
+
+        # Step 2: Remove duplicates already on Monday.com
+        existing_links = fetch_existing_links()
+        filtered = []
+        for m in all_matches:
+            nct_id = m.get("nct_id")
+            trial_link = f"https://clinicaltrials.gov/study/{nct_id}"
+            if trial_link not in existing_links:
+                filtered.append(m)
+
+        state["matched_studies"] = filtered
         state["sent_count"] = 0
         state["step"] += 1
 
