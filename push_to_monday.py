@@ -30,12 +30,14 @@ def fetch_existing_links():
 
     try:
         data = response.json()
-        for item in data["data"]["boards"][0]["items"]:
-            for col in item["column_values"]:
+        items = data.get("data", {}).get("boards", [{}])[0].get("items", [])
+        for item in items:
+            for col in item.get("column_values", []):
                 if col["id"] == "link_mkrtn4m6" and col["text"]:
                     links.add(col["text"].strip())
     except Exception as e:
-        print("⚠️ Failed to parse existing links:", e)
+        print("❌ Error parsing Monday.com response for existing links:", e)
+        print("🔎 Raw response:", response.text)
 
     return links
 
@@ -72,7 +74,7 @@ def push_to_monday(study, internal_study_name=""):
     }
 
     variables = {
-        "board_id": BOARD_ID,  # now passed as string
+        "board_id": BOARD_ID,
         "group_id": GROUP_ID,
         "item_name": internal_study_name or title,
         "column_values": json.dumps(column_values)
