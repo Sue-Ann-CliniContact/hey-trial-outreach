@@ -2,15 +2,20 @@ import os
 import json
 import requests
 from datetime import date
+import re
 
 MONDAY_API_KEY = os.getenv("MONDAY_API_KEY")
-BOARD_ID = "1999034079"  # Leave as string now
+BOARD_ID = "1999034079"
 GROUP_ID = "topics"
 
 HEADERS = {
     "Authorization": MONDAY_API_KEY,
     "Content-Type": "application/json"
 }
+
+def extract_nct_id(link):
+    match = re.search(r'(NCT\d{8})', link)
+    return match.group(1) if match else None
 
 def fetch_existing_links():
     query = f"""
@@ -34,7 +39,9 @@ def fetch_existing_links():
         for item in items:
             for col in item.get("column_values", []):
                 if col["id"] == "link_mkrtn4m6" and col["text"]:
-                    links.add(col["text"].strip())
+                    nct_id = extract_nct_id(col["text"].strip())
+                    if nct_id:
+                        links.add(nct_id)
     except Exception as e:
         print("❌ Error parsing Monday.com response for existing links:", e)
         print("🔎 Raw response:", response.text)
@@ -42,11 +49,11 @@ def fetch_existing_links():
     return links
 
 def push_to_monday(study, internal_study_name=""):
-    existing_links = fetch_existing_links()
-    study_link = f"https://clinicaltrials.gov/study/{study['nct_id']}"
+    existing_nct_ids = fetch_existing_links()
+    study_nct_id = study["nct_id"]
 
-    if study_link in existing_links:
-        print(f"⏭️ Skipping already pushed study: {study_link}")
+    if study_nct_id in existing_nct_ids:
+        print(f"⏭️ Skipping already pushed study: {study_nct_id}")
         return "Already pushed"
 
     mutation = """
@@ -62,6 +69,7 @@ def push_to_monday(study, internal_study_name=""):
     title = study.get("title", "Untitled")
     summary = study.get("summary", "")
     eligibility = study.get("eligibility_text", "")
+    study_link = f"https://clinicaltrials.gov/study/{study_nct_id}"
 
     column_values = {
         "text_mkrtxgyc": title,
