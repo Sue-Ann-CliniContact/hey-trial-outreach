@@ -14,14 +14,16 @@ HEADERS = {
 
 def fetch_existing_emails():
     query = f"""
-    query {{
+    query GetEmails {{
       boards(ids: {BOARD_ID}) {{
-        items {{
-          id
-          name
-          column_values {{
+        items_page(limit: 100) {{
+          items {{
             id
-            value
+            name
+            column_values {{
+              id
+              value
+            }}
           }}
         }}
       }}
@@ -32,11 +34,10 @@ def fetch_existing_emails():
 
     try:
         data = response.json()
-
-        # 🔍 TEMP DEBUG: print full Monday.com board response
         print("📦 Raw response JSON:", json.dumps(data, indent=2))
 
-        items = data.get("data", {}).get("boards", [{}])[0].get("items", [])
+        board = data.get("data", {}).get("boards", [{}])[0]
+        items = board.get("items_page", {}).get("items", [])
         for item in items:
             for col in item.get("column_values", []):
                 if col["id"] == "email_mkrt39hj" and col["value"]:
@@ -53,7 +54,7 @@ def fetch_existing_emails():
         print("❌ Error parsing Monday.com response for existing emails:", e)
         print("🔎 Raw response:", response.text)
 
-    return email
+    return emails
 
 def push_to_monday(study, internal_study_name=""):
     contact_email = (study.get("contact_email") or "").strip().lower()
