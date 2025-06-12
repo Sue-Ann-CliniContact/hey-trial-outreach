@@ -30,6 +30,10 @@ def fetch_existing_emails():
 
     try:
         data = response.json()
+
+        # 🔍 TEMP DEBUG: print full Monday.com board response
+        print("📦 Raw response JSON:", json.dumps(data, indent=2))
+
         items = data.get("data", {}).get("boards", [{}])[0].get("items", [])
         for item in items:
             for col in item.get("column_values", []):
