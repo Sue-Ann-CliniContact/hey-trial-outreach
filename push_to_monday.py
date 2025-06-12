@@ -17,6 +17,8 @@ def fetch_existing_emails():
     query {{
       boards(ids: {BOARD_ID}) {{
         items {{
+          id
+          name
           column_values {{
             id
             value
