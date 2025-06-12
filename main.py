@@ -81,6 +81,22 @@ async def chat(request: Request):
     session_id = data.get("session_id")
     message = data.get("message", "").strip()
 
+    # ✅ Add reset option
+    if message.lower() in ["new study", "restart", "start over"]:
+        session_memory[session_id] = {
+            "step": 0,
+            "agent_name": "",
+            "agent_title": "",
+            "study_url": "",
+            "challenge_summary": "",
+            "condition": "",
+            "min_age": None,
+            "max_age": None,
+            "matched_studies": [],
+            "sent_count": 0
+        }
+        return {"reply": "🔄 Starting a new study. Who is the CliniContact outreach agent for this effort?"}
+
     if session_id not in session_memory:
         session_memory[session_id] = {
             "step": 0,
