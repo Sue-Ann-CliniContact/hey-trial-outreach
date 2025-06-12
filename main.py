@@ -153,17 +153,14 @@ async def chat(request: Request):
         print(f"✅ Fetched {len(existing_emails)} contact emails from Monday.com")
 
         filtered = []
-        seen = set()
+        seen_emails = set()
         for m in all_matches:
             email = (m.get("contact_email") or "").strip().lower()
-            if not email or email in seen:
+            if not email or email in seen_emails or email in existing_emails:
+                if email in existing_emails:
+                    print(f"⏭️ Skipped already-contacted email: {email}")
                 continue
-            seen.add(email)
-
-            if email in existing_emails:
-                print(f"⏭️ Skipped already-contacted email: {email}")
-                continue
-
+            seen_emails.add(email)
             filtered.append(m)
 
         print(f"✅ Filtered to {len(filtered)} new matches after deduplication")
